@@ -52,7 +52,11 @@ async fn update_table_with_chain(
     };
     let account_owner = user_chain.owner;
     let account_pub_key = match account_owner {
-        Some(owner) => signer.get_public_key(&owner).await,
+        Some(owner) => signer
+            .get_public_key(&owner)
+            .await
+            .map(Some)
+            .expect("Failed to get public key from Signer"),
         None => None,
     };
     table.add_row(vec![

@@ -249,6 +249,7 @@ impl<C: ClientContext> ChainListener<C> {
                     .signer()
                     .contains_key(&chain_owner)
                     .await
+                    .map_err(ChainClientError::signer_failure)?
                 {
                     context_guard
                         .update_wallet_for_new_chain(

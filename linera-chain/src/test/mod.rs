@@ -84,7 +84,7 @@ pub trait BlockTestExt: Sized {
         self,
         owner: AccountOwner,
         signer: &(impl Signer + ?Sized),
-    ) -> BlockProposal {
+    ) -> Result<BlockProposal, Box<dyn std::error::Error>> {
         self.into_proposal_with_round(owner, signer, Round::MultiLeader(0))
             .await
     }
@@ -95,7 +95,7 @@ pub trait BlockTestExt: Sized {
         owner: AccountOwner,
         signer: &(impl Signer + ?Sized),
         round: Round,
-    ) -> BlockProposal;
+    ) -> Result<BlockProposal, Box<dyn std::error::Error>>;
 }
 
 impl BlockTestExt for ProposedBlock {
@@ -141,7 +141,7 @@ impl BlockTestExt for ProposedBlock {
         owner: AccountOwner,
         signer: &(impl Signer + ?Sized),
         round: Round,
-    ) -> BlockProposal {
+    ) -> Result<BlockProposal, Box<dyn std::error::Error>> {
         BlockProposal::new_initial(owner, round, self, signer).await
     }
 }

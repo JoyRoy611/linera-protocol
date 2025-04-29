@@ -2162,7 +2162,13 @@ async fn run(options: &ClientOptions) -> Result<i32, Error> {
                     .await?
                     .mutate(|w| w.forget_keys(chain_id))
                     .await??;
-                if !options.signer().await?.contains_key(&owner).await {
+                if !options
+                    .signer()
+                    .await?
+                    .contains_key(&owner)
+                    .await
+                    .expect("Signer error")
+                {
                     warn!("no keypair found in keystore for chain {chain_id}");
                 }
                 info!(

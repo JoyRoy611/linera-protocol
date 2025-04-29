@@ -599,6 +599,12 @@ impl From<Infallible> for ChainClientError {
     }
 }
 
+impl ChainClientError {
+    pub fn signer_failure(_err: Box<dyn std::error::Error>) -> Self {
+        Self::BlockProposalError("Signer failure")
+    }
+}
+
 // We never want to pass the DashMap references over an `await` point, for fear of
 // deadlocks. The following construct will cause a (relatively) helpful error if we do.
 
@@ -1070,7 +1076,11 @@ impl<Env: Environment> ChainClient<Env> {
             .chain(&manager.leader)
             .any(|owner| *owner == preferred_owner);
 
-        let has_signer = self.signer().contains_key(&preferred_owner).await;
+        let has_signer = self
+            .signer()
+            .contains_key(&preferred_owner)
+            .await
+            .map_err(ChainClientError::signer_failure)?;
 
         if is_owner && has_signer {
             Ok(preferred_owner)
@@ -2695,17 +2705,21 @@ impl<Env: Environment> ChainClient<Env> {
         let proposal = if let Some(locking) = info.manager.requested_locking {
             Box::new(match *locking {
                 LockingBlock::Regular(cert) => {
-                    BlockProposal::new_retry(owner, round, cert, self.signer()).await
+                    BlockProposal::new_retry(owner, round, cert, self.signer())
+                        .await
+                        .map_err(ChainClientError::signer_failure)?
                 }
                 LockingBlock::Fast(proposal) => {
                     BlockProposal::new_initial(owner, round, proposal.content.block, self.signer())
                         .await
+                        .map_err(ChainClientError::signer_failure)?
                 }
             })
         } else {
             Box::new(
                 BlockProposal::new_initial(owner, round, proposed_block.clone(), self.signer())
-                    .await,
+                    .await
+                    .map_err(ChainClientError::signer_failure)?,
             )
         };
         if !already_handled_locally {

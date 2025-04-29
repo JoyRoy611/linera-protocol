@@ -17,26 +17,40 @@ pub trait Signer: Send + Sync {
     // DEV: We sign `CryptoHash` type, rather than `&[u8]` to make sure we don't sign
     // things accidentally. See [`CryptoHash::new`] for how the type's name is included
     // in the resulting hash, providing the canonicity of the hashing process.
-    async fn sign(&self, owner: &AccountOwner, value: &CryptoHash) -> Option<AccountSignature>;
+    async fn sign(
+        &self,
+        owner: &AccountOwner,
+        value: &CryptoHash,
+    ) -> Result<AccountSignature, Box<dyn std::error::Error>>;
 
     /// Returns the public key corresponding to the given `owner`.
-    async fn get_public_key(&self, owner: &AccountOwner) -> Option<AccountPublicKey>;
+    async fn get_public_key(
+        &self,
+        owner: &AccountOwner,
+    ) -> Result<AccountPublicKey, Box<dyn std::error::Error>>;
 
     /// Returnes whether the given `owner` is a known signer.
-    async fn contains_key(&self, owner: &AccountOwner) -> bool;
+    async fn contains_key(&self, owner: &AccountOwner) -> Result<bool, Box<dyn std::error::Error>>;
 }
 
 #[async_trait]
 impl Signer for Box<dyn Signer> {
-    async fn sign(&self, owner: &AccountOwner, value: &CryptoHash) -> Option<AccountSignature> {
+    async fn sign(
+        &self,
+        owner: &AccountOwner,
+        value: &CryptoHash,
+    ) -> Result<AccountSignature, Box<dyn std::error::Error>> {
         (**self).sign(owner, value).await
     }
 
-    async fn get_public_key(&self, owner: &AccountOwner) -> Option<AccountPublicKey> {
+    async fn get_public_key(
+        &self,
+        owner: &AccountOwner,
+    ) -> Result<AccountPublicKey, Box<dyn std::error::Error>> {
         (**self).get_public_key(owner).await
     }
 
-    async fn contains_key(&self, owner: &AccountOwner) -> bool {
+    async fn contains_key(&self, owner: &AccountOwner) -> Result<bool, Box<dyn std::error::Error>> {
         (**self).contains_key(owner).await
     }
 }
@@ -162,27 +176,39 @@ mod in_mem {
     #[async_trait]
     impl Signer for InMemorySigner {
         /// Creates a signature for the given `value` using the provided `owner`.
-        async fn sign(&self, owner: &AccountOwner, value: &CryptoHash) -> Option<AccountSignature> {
+        async fn sign(
+            &self,
+            owner: &AccountOwner,
+            value: &CryptoHash,
+        ) -> Result<AccountSignature, Box<dyn std::error::Error>> {
             let inner = self.0.read().unwrap();
             if let Some(secret) = inner.keys.get(owner) {
                 let signature = secret.sign_prehash(*value);
-                Some(signature)
+                Ok(signature)
             } else {
-                None
+                Err("No key found for the given owner".into())
             }
         }
 
         /// Returns the public key corresponding to the given `owner`.
-        async fn get_public_key(&self, owner: &AccountOwner) -> Option<AccountPublicKey> {
+        async fn get_public_key(
+            &self,
+            owner: &AccountOwner,
+        ) -> Result<AccountPublicKey, Box<dyn std::error::Error>> {
             let inner = self.0.read().unwrap();
-            let secret = inner.keys.get(owner)?;
-            Some(secret.public())
+            match inner.keys.get(owner).map(|s| s.public()) {
+                Some(public) => Ok(public),
+                None => Err("No key found for the given owner".into()),
+            }
         }
 
         /// Returnes whether the given `owner` is a known signer.
-        async fn contains_key(&self, owner: &AccountOwner) -> bool {
+        async fn contains_key(
+            &self,
+            owner: &AccountOwner,
+        ) -> Result<bool, Box<dyn std::error::Error>> {
             let inner = self.0.read().unwrap();
-            inner.keys.contains_key(owner)
+            Ok(inner.keys.contains_key(owner))
         }
     }
 

@@ -541,7 +541,8 @@ impl<Env: Environment> Benchmark<Env> {
                 proposed_block,
                 chain_client.signer(),
             )
-            .await;
+            .await
+            .expect("Signer failure");
 
             chain_client
                 .submit_block_proposal(&committee, Box::new(proposal), value)

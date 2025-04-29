@@ -2,7 +2,10 @@
 // Copyright (c) Zefchain Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    error::Error,
+};
 
 use async_graphql::SimpleObject;
 use custom_debug_derive::Debug;
@@ -516,22 +519,21 @@ impl BlockProposal {
         round: Round,
         block: ProposedBlock,
         signer: &(impl Signer + ?Sized),
-    ) -> Self {
+    ) -> Result<Self, Box<dyn Error>> {
         let content = ProposalContent {
             round,
             block,
             outcome: None,
         };
-        let signature = signer
-            .sign(&owner, &CryptoHash::new(&content))
-            .await
-            .unwrap();
-        Self {
+        let signature = signer.sign(&owner, &CryptoHash::new(&content)).await?;
+        let public_key = signer.get_public_key(&owner).await?;
+
+        Ok(Self {
             content,
-            public_key: signer.get_public_key(&owner).await.unwrap(),
+            public_key,
             signature,
             validated_block_certificate: None,
-        }
+        })
     }
 
     pub async fn new_retry(
@@ -539,7 +541,7 @@ impl BlockProposal {
         round: Round,
         validated_block_certificate: ValidatedBlockCertificate,
         signer: &(impl Signer + ?Sized),
-    ) -> Self {
+    ) -> Result<Self, Box<dyn Error>> {
         let lite_cert = validated_block_certificate.lite_certificate().cloned();
         let block = validated_block_certificate.into_inner().into_inner();
         let (block, outcome) = block.into_proposal();
@@ -548,16 +550,15 @@ impl BlockProposal {
             round,
             outcome: Some(outcome),
         };
-        let signature = signer
-            .sign(&owner, &CryptoHash::new(&content))
-            .await
-            .unwrap();
-        Self {
+        let signature = signer.sign(&owner, &CryptoHash::new(&content)).await?;
+
+        let public_key = signer.get_public_key(&owner).await?;
+        Ok(Self {
             content,
-            public_key: signer.get_public_key(&owner).await.unwrap(),
+            public_key,
             signature,
             validated_block_certificate: Some(lite_cert),
-        }
+        })
     }
 
     pub fn check_signature(&self) -> Result<(), CryptoError> {
